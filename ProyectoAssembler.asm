@@ -358,4 +358,4 @@ int 21h
 ret
 imprimirColumnas ENDP
 
-END mai
+END main

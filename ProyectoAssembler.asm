@@ -224,7 +224,7 @@ xor dx, dx        ; limpiar DX antes de division
 mov si, 10
 div si              ; AX/10 -> AX=cociente, DX=residuo -> llevamos a base 10
 ; Guardar digito en bufDec[cx]
-mov dl, dl          ; DX residuo en DL (0..9)
+; DX residuo en DL (0..9)
 add dl, '0'         ; convertir a ASCII ('0'..'9')
 mov bx, cx
 mov buf0[bx], dl    

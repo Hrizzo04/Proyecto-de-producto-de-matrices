@@ -7,7 +7,6 @@
 - Ismael Quintero  
 
 **Asignatura:** Organización del Computador  
-**Lapso:** 2026-15 
 
 ## 📌 Descripción
 

@@ -9,7 +9,7 @@
 SUMLO dw 0  ; guarda la parte pequena de la suma acumulada
 SUMHI dw 0  ; guarda la parte alta de la suma acumulada
 N dw 8      ; tamano de la matriz (entre 3 y 8)
-bufDec label byte
+bufDec label byte ; buffer para convertir a decimal
 buf0 db 0
 buf1 db 0
 buf2 db 0
@@ -109,12 +109,12 @@ multiplicarMatrices PROC
 xor di, di              ; i = 0
 for_i:
 cmp di, N
-jge end_mult
+jge end_mult            ; fin de i
 
 xor si, si              ; j = 0
 for_j:
 cmp si, N
-jge next_i
+jge next_i              ; siguiente i
 
 ; sum = 0 (32 bits en SUMHI:SUMLO)
 mov SUMLO, 0
@@ -123,7 +123,7 @@ mov SUMHI, 0
 xor cx, cx              ; k = 0
 for_k:
 cmp cx, N
-jge store_prod
+jge store_prod      ; guardar producto
 
 ; ---------------------------
 ; Cargar A[i][k]
@@ -149,13 +149,13 @@ imul bp                 ; DX:AX = AX * BP (signed 16x16 -> 32 bits)
 
 ; sum += DX:AX
 ; SUMLO += AX, SUMHI += DX + carry
-push ax
+push ax                 ; AX = producto low
 mov ax, SUMLO
 pop bx                  ; BX = producto low
-add ax, bx
+add ax, bx              ; SUMLO + producto low
 mov SUMLO, ax
 mov ax, SUMHI
-adc ax, dx
+adc ax, dx              ; SUMHI + producto high + carry
 mov SUMHI, ax
 
 ; siguiente k
@@ -171,7 +171,7 @@ add bx, si              ; i*8 + j
 shl bx, 1               ; *2 -> bytes
 
 mov ax, SUMLO
-mov [PROD + bx], ax
+mov [PROD + bx], ax     ; PROD[i][j] = SUMLO
 
 ; siguiente j
 inc si
@@ -190,68 +190,71 @@ multiplicarMatrices ENDP
 
 ; Imprime AX como entero decimal con signo (16-bit)
 imprimirNumero PROC
-push ax
-push bx
-push cx
-push dx
-push si
+push ax     ; guardar registros
+push bx     ; guardar registros
+push cx     ; guardar registros
+push dx     ; guardar registros
+push si     ; guardar registros
 
 mov bx, ax           ; BX = valor original
 ; ZER0
 cmp bx, 0
-jne not_zero
-mov dl, '0'
-mov ah, 2
-int 21h
+jne not_zero    ; no es cero
+mov dl, '0'     ; caracter '0'
+mov ah, 2       ; funcion imprimir caracter
+int 21h         ; imprimir '0'
 jmp done
 
 not_zero:
 ; SIGNO
 mov si, 0            ; si = 1 si hay signo
 cmp bx, 0
-jge pos
-mov dl, '-'
-mov ah, 2
-int 21h
-neg bx
+jge pos             ; positivo -> comparador >=
+mov dl, '-'         ; signo negativo
+mov ah, 2           ; funcion imprimir caracter
+int 21h             ; imprimir signo
+neg bx              ; hacer positivo
 pos:
 ; CONVERTIR A DECIMAL EN bufDec (al derecho)
-; Vamos llenando de atrás hacia adelante
-mov cx, 0           ; contador de dígitos
+; Vamos llenando de atras hacia adelante
+mov cx, 0           ; contador de digitos
 conv_loop:
 mov ax, bx
-xor dx, dx
+xor dx, dx        ; limpiar DX antes de division
 mov si, 10
-div si              ; AX/10 -> AX=cociente, DX=residuo
-; Guardar dígito en bufDec[cx]
+div si              ; AX/10 -> AX=cociente, DX=residuo -> llevamos a base 10
+; Guardar digito en bufDec[cx]
 mov dl, dl          ; DX residuo en DL (0..9)
-add dl, '0'
+add dl, '0'         ; convertir a ASCII ('0'..'9')
 mov bx, cx
-mov buf0[bx], dl
-
+mov buf0[bx], dl    
 inc cx
 mov bx, ax          ; siguiente cociente
 cmp bx, 0
 jne conv_loop
 
-; Imprimir dígitos en orden inverso: bufDec[cx-1 .. 0]
+; Imprimir digitos en orden inverso: bufDec[cx-1 .. 0]
+; Ya que se guarda de manera inversa
+; ejemplo: si tenemos 123, se guarda como ->
+; bufDec[0]='3', bufDec[1]='2', bufDec[2]='1', cx=3 
+
 print_rev:
 dec cx
-mov bx, cx
-mov dl, buf0[bx]
-mov ah, 2
-int 21h
+mov bx, cx  ; indice del digito a imprimir
+mov dl, buf0[bx]    ; cargar digito
+mov ah, 2  ; funcion imprimir caracter 
+int 21h    ; imprimir caracter
 cmp cx, 0
-jne print_rev
+jne print_rev   ; repetir hasta cx=0
 
 
 done:
-pop si
-pop dx
-pop cx
-pop bx
-pop ax
-ret
+pop si          ; restaurar registros
+pop dx          ; restaurar registros
+pop cx          ; restaurar registros
+pop bx          ;   restaurar registros
+pop ax          ; restaurar registros
+ret             ;  vuelva al llamador
 imprimirNumero ENDP
 
 ; -------------------------------
@@ -260,12 +263,12 @@ imprimirFilas PROC
 xor di, di              ; i = 0
 fila_loop1:
 cmp di, N
-jge end_filas
+jge end_filas           ; fin de filas -> comparador >=
 
 xor si, si              ; j = 0
 col_loop2:
 cmp si, N
-jge next_fila
+jge next_fila           ; fin de columnas -> comparador >=
 
 ; offset = (i*8 + j)*2
 mov bx, di
@@ -277,33 +280,33 @@ mov ax, [PROD + bx]     ; AX = PROD[i][j]
 call imprimirNumero        ; imprimir numero
 
 ; imprimir espacio
-mov dl, ' '
-mov ah, 2
-int 21h
+mov dl, ' '     ;   caracter espacio 
+mov ah, 2       ; funcion imprimir caracter
+int 21h         ; imprimir caracter
 
 inc si
 jmp col_loop2
 
 next_fila:
 ; salto de linea
-mov dl, 0Dh
-mov ah, 2
-int 21h
-mov dl, 0Ah
-mov ah, 2
-int 21h
+mov dl, 0Dh     ; caracter retorno carro
+mov ah, 2       ; funcion imprimir caracter
+int 21h         ; imprimir caracter
+mov dl, 0Ah     ; caracter nueva linea
+mov ah, 2       ; funcion imprimir caracter
+int 21h         ; imprimir caracter
 
 inc di
 jmp fila_loop1
 
 end_filas:
 ; salto de linea final
-mov dl, 0Dh
-mov ah, 2
-int 21h
-mov dl, 0Ah
-mov ah, 2
-int 21h
+mov dl, 0Dh     ; caracter retorno carro
+mov ah, 2       ; funcion imprimir caracter
+int 21h         ; imprimir caracter
+mov dl, 0Ah     ; caracter nueva linea
+mov ah, 2       ; funcion imprimir caracter
+int 21h         ; imprimir caracter
 
 ret
 imprimirFilas ENDP
@@ -314,12 +317,12 @@ imprimirColumnas PROC
 xor si, si              ; j = 0 (columna)
 col_loop3:
 cmp si, N
-jge end_cols
+jge end_cols        ; fin de columnas -> comparador >=
 
 xor di, di              ; i = 0 (fila)
 fila_loop4:
 cmp di, N
-jge next_col
+jge next_col        ; fin de filas -> comparador >=
 
 ; offset = (i*8 + j)*2
 mov bx, di
@@ -331,29 +334,29 @@ mov ax, [PROD + bx]     ; AX = PROD[i][j]
 call imprimirNumero        ; imprimir numero
 
 ; imprimir espacio
-mov dl, ' '
-mov ah, 2
-int 21h
+mov dl, ' '    ;   caracter espacio
+mov ah, 2       ; funcion imprimir caracter
+int 21h     ; imprimir caracter
 
 inc di
 jmp fila_loop4
 
 next_col:
 ; salto de linea al terminar una columna
-mov dl, 0Dh
-mov ah, 2
-int 21h
-mov dl, 0Ah
-mov ah, 2
-int 21h
+mov dl, 0Dh     ; caracter retorno carro
+mov ah, 2       ; funcion imprimir caracter
+int 21h         ; imprimir caracter
+mov dl, 0Ah     ; caracter nueva linea
+mov ah, 2       ; funcion imprimir caracter
+int 21h     ; imprimir caracter
 
 inc si
 jmp col_loop3
 
 end_cols:
 ; pausa al final de impresion por columnas
-mov ah, 1
-int 21h
+mov ah, 1       ; esperar tecla
+int 21h             
 
 ret
 imprimirColumnas ENDP
